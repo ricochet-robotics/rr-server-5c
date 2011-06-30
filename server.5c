@@ -1,0 +1,115 @@
+/*
+ * $Id: server.5c,v 1.11 2003/06/03 08:02:54 keithp Exp $
+ *
+ * Copyright © 2003 Keith Packard
+ *
+ * Permission to use, copy, modify, distribute, and sell this software and its
+ * documentation for any purpose is hereby granted without fee, provided that
+ * the above copyright notice appear in all copies and that both that
+ * copyright notice and this permission notice appear in supporting
+ * documentation, and that the name of Keith Packard not be used in
+ * advertising or publicity pertaining to distribution of the software without
+ * specific, written prior permission.  Keith Packard makes no
+ * representations about the suitability of this software for any purpose.  It
+ * is provided "as is" without express or implied warranty.
+ *
+ * KEITH PACKARD DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
+ * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
+ * EVENT SHALL KEITH PACKARD BE LIABLE FOR ANY SPECIAL, INDIRECT OR
+ * CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE,
+ * DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+ * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ */
+
+autoload RR
+
+namespace Server {
+
+    import RR;
+
+    public typedef Client;
+    public typedef Game;
+
+    mutex   server_mutex = Mutex::new ();
+
+    string	server_id = "RicochetServer";
+
+    public void set_server_id (string id) { server_id = id; }
+
+    public bool lock () {
+	Mutex::acquire (server_mutex);
+#	printf ("lock %v\n", Thread::current());
+	return true;
+    }
+
+    public bool unlock () {
+#	printf ("unlock %v\n", Thread::current());
+	Mutex::release (server_mutex);
+	return true;
+    }
+
+    public typedef struct {
+	int	x, y;
+	Object	object;
+    } ObjectLoc;
+
+    public typedef union {
+	void	none;
+	string	username;
+    } User;
+
+    public typedef union {
+	void	none;
+	&Game	game;
+    } GameRef;
+
+    public typedef union {
+	void	none;
+	int	number;
+    } Bid;
+    
+    public typedef struct {
+	file	    f;
+	User	    user;
+	GameRef	    game;
+	int	    score;
+	int	    games;
+	Bid	    bid;
+	bool	    playing;
+	bool	    abandon;
+	bool	    nobid;
+    } Client;
+
+    public typedef union {
+	void	none;
+	int	seconds;
+    } Time;
+
+    public typedef union {
+	void	none;
+	&Client	client;
+    } ClientRef;
+    
+    public typedef union {
+	void	none;
+	Board	board;
+    } BoardOrNone;
+
+    public typedef struct {
+	string		name;
+	GameState	state;
+	(&Client)[*]	clients;
+	Target[*]	targets;
+	Target		target;
+	Board		board;
+	int		expire_interval;
+	int		expire_time;
+	ClientRef	active;
+	ObjectLoc[*]    history;
+	int		timer_serial;
+	BoardOrNone	next_board;
+    } Game;
+
+    public exception notreached ();
+}

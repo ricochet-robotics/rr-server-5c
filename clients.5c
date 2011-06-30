@@ -1,0 +1,134 @@
+/*
+ * $Id: clients.5c,v 1.4 2003/05/30 21:39:11 keithp Exp $
+ *
+ * Copyright © 2003 Keith Packard
+ *
+ * Permission to use, copy, modify, distribute, and sell this software and its
+ * documentation for any purpose is hereby granted without fee, provided that
+ * the above copyright notice appear in all copies and that both that
+ * copyright notice and this permission notice appear in supporting
+ * documentation, and that the name of Keith Packard not be used in
+ * advertising or publicity pertaining to distribution of the software without
+ * specific, written prior permission.  Keith Packard makes no
+ * representations about the suitability of this software for any purpose.  It
+ * is provided "as is" without express or implied warranty.
+ *
+ * KEITH PACKARD DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
+ * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
+ * EVENT SHALL KEITH PACKARD BE LIABLE FOR ANY SPECIAL, INDIRECT OR
+ * CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE,
+ * DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+ * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ */
+
+autoload Array
+autoload RR
+autoload RR::Send
+autoload Server
+
+extend namespace Server {
+    public namespace Clients {
+	(&Client)[0]    clients = {};
+
+	public void iterate (void (&Client c) f) {
+	    Array::iterate (&clients, f);
+	}
+
+	public exception no_such_client (file f);
+
+	public void client_send (&Client c, string fmt, poly args...) {
+	    RR::Send::send (c.f, fmt, args...);
+	    File::flush (c.f);
+	}
+
+	public void server_send (string fmt, poly args...) {
+	    void	message_client (&Client o) {
+		client_send (&o, fmt, args...);
+	    }
+	    Clients::iterate (message_client);
+	}
+
+	public &Client select (file f) {
+	    exception found (&Client c);
+	    try {
+		void pick (&Client c) {
+		    if (c.f == f)
+			raise found (&c);
+		}
+		iterate (pick);
+	    } catch found (&Client c) {
+		return &c;
+	    }
+	    raise no_such_client (f);
+	}
+
+	public ClientRef find (string name) {
+	    exception found (&Client c);
+	    try {
+		void pick (&Client c) {
+		    if (c.user == (User.username) name)
+			raise found (&c);
+		}
+		iterate (pick);
+	    } catch found (&Client c) {
+		return (ClientRef.client) (&c);
+	    }
+	    return ClientRef.none;
+	}
+	
+	public &Client new (file f) {
+	    return Array::append (&clients, 
+				  reference ((Client) { 
+				    f = f, 
+				    user = User.none, 
+				    game = GameRef.none,
+				    games = 0
+				  }));
+	    return &clients[dim(clients)-1];
+	}
+
+	public void dispose (&Client c) {
+	    printf ("Client closed %v\n", c.user);
+	    if (c.user != User.none)
+		Clients::server_send ("NOTICE QUIT %s\n", c.user.username);
+	    Array::remove (&clients, &c);
+	    File::close (c.f);
+	}
+
+	public void print (&Client c) {
+	    printf ("%v\n", c);
+	}
+	
+	public void print_client (&Client c, &Client o) {
+	    union switch (o.user) {
+	    case none:
+		break;
+	    case username u:
+		client_send (&c, " %s", u);
+		break;
+	    }
+	}
+
+	public void print_client_score (&Client c, &Client o) {
+	    union switch (o.user) {
+	    case none:
+		break;
+	    case username u:
+		client_send (&c, " %s %d", u, o.score);
+		break;
+	    }
+	}
+
+	public void print_client_games (&Client c, &Client o) {
+	    union switch (o.user) {
+	    case none:
+		break;
+	    case username u:
+		client_send (&c, " %s %d", u, o.games);
+		break;
+	    }
+	}
+
+    }
+}

@@ -1,0 +1,11 @@
+This is a server for the Ricochet Robots protocol written by
+Keith Packard in 2003 in the Nickle programming language
+(http://nickle.org). Various clients and solvers that speak
+this protocol are available from the Ricochet Robotics
+project. Enjoy.
+
+This project is available under license terms described in
+the file COPYING in this directory.
+
+   Bart Massey <bart@cs.pdx.edu>
+   2011-06-30

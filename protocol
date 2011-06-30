@@ -1,0 +1,699 @@
+		 Ricochet Robots Game Protocol (RRGP)
+			   Version 0.1.2
+			     2003-5-31
+		
+		  Keith Packard         Carl Worth
+		keithp@keithp.com     cworth@isi.edu
+
+Introduction
+
+RRGP is a network protocol for playing the Ricochet Robots game.  It permits
+a single server to host multiple games with named participants.  The
+protocol is designed so that people can play using only telnet, but it is
+expected that graphical interfaces will be able to drive the protocol as
+well.
+
+RRGP borrows ideas from other network protocols like SMTP using a
+synchronous command interface.
+
+Document Conventions
+
+	All commands include a response (yeah, synchronous protocols are
+	bad.  tough)
+
+	<command> <args> 
+
+	->
+
+	<response>
+
+	<response> is one of:
+
+	<command> <args>
+	ERROR <message>
+
+1. Requests
+
+1.1 Connection setup
+
+    The RRGP server has no well defined port; agreement on which port to
+    use must be done through some external mechanism.  Once connected,
+    the client must identify itself:
+    
+    HELO <username>
+    
+    ->
+    
+    HELO <servername>
+
+1.2. Global commands
+
+    1.2.1 Listing available users
+
+	WHO
+
+	->
+
+	WHO <username1> <games1> <username2> <games2> ...
+
+	lists connected users and the number of games they've won.
+
+    1.2.2. Listing available games
+
+	GAMES
+
+	->
+
+	GAMES <game1> <game2> ...
+
+    1.2.3. Message
+
+	MESSAGE <text>
+
+	->
+	
+	MESSAGE
+
+    1.2.4. Help
+
+	HELP { <command> }
+
+	Displays help.  If <command> is provided, displays more
+	detailed help on a specific command, otherwise displays an
+	overview of all commands.
+
+    1.2.5. Quit
+
+	QUIT
+
+	->
+
+	QUIT
+
+1.3. Game management commands
+
+    1.3.1. Listing players in a game
+
+	PLAYERS <game>
+
+	->
+
+	PLAYERS <username1> <score1> <username2> <score2> ...
+
+	Possible errors: NOGAME
+
+    1.3.2. Listing watchers of a game
+
+	WATCHERS <game>
+
+	->
+
+	WATCERS <username1> <username2> ...
+
+	Possible errors: NOGAME
+
+    1.3.3. Get game information
+
+	GAMEINFO <game>
+
+	->
+
+	GAMEINFO <turn> <color> <shape> <state> <time> <bid> <active>
+
+	<turn> is a number from 1 to 17 indicating the current turn
+	<color> <shape> indicate the active piece
+	<state> is one of:
+		new	Turn just started, no bids yet
+		bid	Bidding opened.  <time> indicates time remaining,
+			<bid> indicates the minimum bid
+		show	Bidding closed and solution being demonstrated
+			<active> indicates the person demonstrating
+		done 	Current turn is over.  Either a solution
+                        was demonstrated or the players have all
+			given up trying to find a solution.
+	<time> is valid only in BID state, else it's 0
+	<bid> is valid in all but NEW state where it's 0
+	<active> is valid in SHOW state, else it's ""
+
+	Possible errors: NOGAME
+
+    1.3.4. Creating a new game
+
+	NEW <game-suggestion>
+
+	->
+
+	NEW <game>
+
+    1.3.5. Joining an existing game
+
+	JOIN <game>
+
+	->
+
+	JOIN
+
+	Possible errors: NOGAME
+
+    1.3.6. Watching an existing game
+
+	WATCH <game>
+
+	->
+
+	WATCH
+
+	The client will monitor the game, but not be listed in the
+	userlist nor be allowed to make moves.
+
+	Possible errors: NOGAME
+
+    1.3.7. Dispose an empty game
+
+	DISPOSE <game>
+
+	->
+
+	DISPOSE
+
+	Disposes <game> unless it still has players associated.
+
+	Possible errors: NOGAME NOTEMPTY
+
+1.4. User information commands
+
+    1.4.1. Get user information
+    
+	USERINFO <username>
+    
+	->
+    
+	USERINFO <game> <playing> <score> <bid>
+    
+	<game> is any currently associated game, else "".  If the user
+	is not associated with any game, the remaining fields are
+	false 0 0.
+	
+	<playing> is true if the user is playing and false if watching.
+    
+	<score> is a number from 0 to 17 indicating this players score
+    
+	<bid> is either "0" indicating no bid or a number indicating
+	the users minimum bid.
+	    
+1.5. In-game commands
+
+    1.5.1. Global game commands
+
+	1.5.1.1 Get the game contents
+    
+	    SHOW
+    
+	    ->
+    
+	    SHOW <game-board>
+    
+	    <game-board> is a quoted multi-line string containing an
+	    diagram of the game contents, (an array of cells). A single
+	    cell and its surrounding are indicated as:
+    
+	     HHH 
+	    VrcsV
+	     HHH
+    
+	    H = ' ' or '='
+	    V = ' ' or '|'
+	    r = '.' or <robot-color>  (one of 'r', 'g', 'b', or 'y')
+	    c = '.' or <target-color> (one of 'r', 'g', 'b', or 'y')
+	    s = '.' or <target-shape> (one of 'c', 's', 'o', or 't')
+    
+	    The goal robot and target (color and shape) are indicated with
+	    capital letters.
+    
+	    For example:
+    
+	    SHOW "
+	     ===
+	    |R.. ... .gs
+	    
+	     byc|... .RT|
+	     ===    ==="
+    
+	    R.. = 	Red robot (goal robot)
+	    .gs = 	Green square target
+	    byc = 	Blue robot on yellow circle target
+	    .RT =	Red triangle (goal target)
+    
+	    Possible errors: NOTINGAME
+    
+	1.5.1.2. Next turn
+    
+	    TURN
+    
+	    ->
+    
+	    TURN
+    
+	    Advance the game to the next turn, (which will have a new
+	    target square).  TURN is valid only when the game is in
+	    the DONE state
+		    
+	    Possible errors: NOTINGAME, NOTDONE
+    
+	1.5.1.3. Part
+    
+	    PART
+    
+	    ->
+    
+	    PART
+    
+	    Departs the current game
+    
+    1.5.2. Bidding commands 
+
+	1.5.2.1 Bid
+    
+	    BID <number>
+    
+	    ->
+    
+	    BID
+    
+	    Possible errors: NOTINGAME, NOTBIDDING, NOTNUMBER, NOTLOWER
+    
+	1.5.2.2. Revoke
+    
+	    REVOKE
+    
+	    ->
+    
+	    REVOKE
+    
+	    Possible errors: NOTINGAME, NOTBIDDING, NOBID
+    
+	1.5.2.3. Abandon
+    
+	    ABANDON
+    
+	    ->
+    
+	    ABANDON
+    
+	    Possible errors: NOTINGAME, NOTBIDDING
+    
+	    Mark this user as having abandoned this turn.  If all users
+	    abandon, then the game state is switched to DONE.
+
+	1.5.2.4. No more bids
+
+	    NOBID
+
+	    ->
+
+	    NOBID
+
+	    Possible errors: NOTINGAME, NOTBIDDING
+    
+	    Mark this user as done bidding.  If all users NOBID, then
+	    the game state is switched to SHOW.
+    
+    1.5.3. Solving commands
+
+	1.5.3.1. Move
+    
+	    MOVE <color> <dir1> <dir2> ...
+    
+	    ->
+    
+	    MOVE <count>
+    
+	    <color> is one of 'R', 'Y', 'G' or 'B', <dir> is one of 'N',
+	    'E', 'S' or 'W'.
+    
+	    Possible errors: NOTINGAME, NOTACTIVE, BLOCKED, TOOMANYMOVES
+    
+	1.5.3.2. Undo
+    
+	    UNDO
+    
+	    ->
+    
+	    UNDO
+    
+	    Undoes the last move
+    
+	    Possible errors: NOTINGAME, NOTACTIVE
+    
+	    XXX: Do we add another error code for no further undo?
+    
+	1.5.3.3. Reset
+    
+	    RESET
+    
+	    ->
+    
+	    RESET
+    
+	    Resets robot positions to that at the start of the turn.
+    
+	    Possible errors: NOTINGAME, NOTACTIVE
+    
+	1.5.3.4. Pass the demonstration to the next lowest bidder
+    
+	    PASS
+    
+	    ->
+    
+	    PASS
+    
+	    Possible errors: NOTINGAME
+	
+2. Asynchronous notification.  
+
+    The server will send notices to each user in a game whenever
+    there is a move. It will also send notices to every connected
+    client when additional people join or new games are
+    started. These are of the form:
+
+	NOTICE <notice-code> <args>
+
+    Game-specific notices are sent to users involved in the related
+    game, other notices are sent to all users.  Note that even the user
+    originating the notice receives a copy.
+
+2.1. Global notices
+
+    These notices are sent to all connected clients
+
+    2.1.1. New users
+    
+	NOTICE USER <username>
+    
+    2.1.2. Disconnected user
+    
+	NOTICE QUIT <username>
+    
+    2.1.3. New games
+    
+	NOTICE GAME <game>
+    
+    2.1.4. Terminated games
+    
+	NOTICE DISPOSE <game>
+    
+    2.1.5. Message
+
+	NOTICE MESSAGE <username> <text>
+
+2.2. Game notices
+
+    These notices are sent to all players and watchers in
+    the affected game
+
+    2.2.1. Global game notices
+
+	2.2.1.1 Game state change
+	
+	    NOTICE GAMESTATE <state>
+
+	    Game state has changed to <state>
+
+	2.2.1.2. Next turn (game)
+
+	    NOTICE TURN <color> <shape>
+
+	    Note that the game state is implicitly changed to New
+
+	2.2.1.3. Next game (game)
+
+	    NOTICE GAME
+
+	2.2.1.4. Join game (game)
+	
+	    NOTICE JOIN <username>
+	
+	2.2.1.5. Watch game (game)
+	
+	    NOTICE WATCH <username>
+	
+	2.2.1.6. User departed game (game)
+	
+	    NOTICE PART <username>
+	
+    2.2.2. Bid notices
+
+	Notices sent duing the bidding phase of a turn
+    
+	2.2.2.1. Bids (game)
+	
+	    NOTICE BID <username> <number>
+	
+	2.2.2.2. Revoke (game)
+	
+	    NOTICE REVOKE <username>
+
+	    The specific user has revoked their bid. If there
+	    are no other bids outstanding, the game state is
+	    returned to New.
+	
+	2.2.2.3. Timer (game)
+	
+	    NOTICE TIME <seconds>
+    
+	    Timer ticks are sent every 10 seconds after the first
+	    bid has been made
+
+	2.2.2.4. Abandon request
+
+	    NOTICE ABANDON <username>
+    
+	    <username> has requested that the current turn be abandoned
+	    before bidding has closed.  If all players make such
+	    a request, the TURN command may be used to move to the next
+	    turn.
+
+	2.2.2.5. Nobid request
+
+	    NOTICE NOBID <username>
+
+	    <username> has announced that they plan on making no more bids
+	    in the current turn.  If all players make such a request,
+	    the game moves to the SHOW state.
+
+   2.2.3. Solving notices
+
+	Notices sent during the solving phase of a turn
+	    	
+	2.2.3.1. Select active player (game)
+
+	    NOTICE ACTIVE <username> <bid>
+
+	    Only the active player may move the robots
+
+	2.2.3.2. Move notice (game)
+
+	    NOTICE MOVE <count> <color> <dir>
+
+	2.2.3.3. Undo (game)
+
+	    NOTICE UNDO
+
+	2.2.3.4. Reset (game)
+
+	    NOTICE RESET
+
+	2.2.3.5. Position (after move/undo/reset)
+
+	    NOTICE POSITION <color> <x> <y>
+
+	    The indicated robot has moved to the indicated position.
+	    The board is 0-based with the origin in the upper left
+	    corner.
+
+	2.2.3.6. Score (game)
+
+	    NOTICE SCORE <username> <score>
+
+	    The indicated user has demonstrated a solution and
+	    received a point.
+
+3. Errors
+
+    The following error codes may be returned.
+
+3.1. Connection setup errors
+
+    These errors occur during connection setup.
+
+    3.1.1. No name set
+    
+	ERROR NONAMESET
+    
+	'helo' must be sent before any command other than 'quit'.
+    
+    3.1.2. Invalid name
+    
+	ERROR INVALIDNAME
+    
+	All names must be unique.
+
+3.2. Command format errors
+
+    Errors caused by ill-formed commands
+    
+    3.2.1. Command
+    
+	ERROR COMMAND
+    
+	An invalid command was specified
+    
+    3.2.2. Syntax
+    
+	ERROR SYNTAX
+    
+	A syntax error was detected
+    
+    3.2.3. Not number
+    
+	ERROR NOTNUMBER
+    
+	A non-numeric value was supplied where a number was required
+	
+    3.2.4. Not color
+    
+	ERROR NOTCOLOR
+    
+	The color name specified in the command was invalid
+    
+    3.2.5. Not shape
+    
+	ERROR NOTSHAPE
+    
+	The shape name specified in the command was invalid
+    
+    3.2.6. Not direction
+    
+	ERROR NOTDIRECTION
+    
+	The direction name specified in the command was invalid
+
+3.3. Global command errors.
+
+    There are no errors from any of the global commands
+
+3.4. Game management errors.
+
+    Errors from game management commands
+    
+    3.3.1. No such game
+	
+	ERROR NOGAME
+	
+	A game name was provided that does not exist.
+	
+    3.3.2. Not empty
+	
+	ERROR NOTEMPTY
+	
+	DISPOSE was requested for a game with active players
+	
+3.5. User information errors
+
+    3.5.1. No such user
+    
+	ERROR NOUSER
+
+	A user name was provided that does not exist.
+
+3.6. In-game errors
+
+    3.6.1. Global game errors
+    
+	3.6.1.1. Not in game
+    
+	    ERROR NOTINGAME
+    
+	    A game playing command was made, but the user is not a
+	    particpant of any game.
+    
+	    Possibly returned by: SHOW, MOVE, RESET, UNDO, TURN, PASS,
+	    MESSAGE.
+
+	3.6.1.2. Not playing
+
+	    ERROR NOTPLAYING
+
+	    A command was executed by a watching user that is
+	    permitted only to players
+
+	3.6.1.3. Not done
+    
+	    ERROR NOTDONE
+    
+	    TURN was requested and the game is not in DONE state.
+    
+    3.6.2. Bidding errors 
+    
+	3.6.2.1. Not bidding
+
+	    ERROR NOTBIDDING
+    
+	    A bid was submitted after the bidding closed
+    
+	    Possibly returned by: BID
+    
+	3.6.2.2. Not lower
+
+	    ERROR NOTLOWER
+    
+	    A bid was submitted that was higher than previous bid.
+    
+	    Possibly returned by: BID
+    
+	3.6.2.3. No bid
+
+	    ERROR NOBID
+    
+	    A revoke was requested when no bid had been entered
+    
+	    Possibly returned by: REVOKE
+	    
+    3.6.3. Solving mode errors
+    
+	3.6.3.1. Not active
+
+	    ERROR NOTACTIVE
+	
+	    A move, undo or reset was submitted by other than the
+	    active user.
+	    
+	    Possibly returned by: MOVE, RESET, UNDO
+	
+	3.6.3.2. Blocked
+	
+	    ERROR BLOCKED
+	
+	    The robot cannot move the requested direction.
+	
+	    Possibly returned by: MOVE
+	
+	3.6.3.3. TOOMANYMOVES
+	
+	    ERROR TOOMANYMOVES
+	
+	    An attempt was made to make more moves than the users bid
+	
+	    Possibly returned by: MOVE
+	
+
+Some comments/questions
+-----------------------
+
+The server manages ACTIVE based on bids, scores, and PASS
+requests. Once a turn is over, (solution demonstrated or all bidding
+users PASS), it would be nice to allow others to show alternate
+solutions, failed attempts, etc. Shall we provide a way for the ACTIVE
+user to pass control to another, (only when a turn is over)? Or maybe
+since the turn is over we just let any user move the pieces?
+
