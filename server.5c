@@ -22,7 +22,8 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-autoload RR
+autoload RR;
+autoimport Mutex;
 
 namespace Server {
 
